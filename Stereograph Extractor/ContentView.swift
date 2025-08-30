@@ -18,6 +18,8 @@ struct ContentView: View {
     @State private var debugCG: CGImage?
     @State private var fallbackUsed = false
     @State private var keyMonitor: Any?
+    @State private var dragStartRect: CGRect?
+    
     private let numFmt: NumberFormatter = {
         let f = NumberFormatter()
         f.numberStyle = .decimal
@@ -103,119 +105,73 @@ struct ContentView: View {
                                             }
                                         )
                                         .zIndex(2)
-                                    
-                                    // Corner handles (top-left, top-right, bottom-left, bottom-right)
-                                    handle(at: CGPoint(x: viewRect.minX, y: viewRect.minY))
-                                        .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
-                                                let dx = g.translation.width  / scale
-                                                let dy = g.translation.height / scale
-                                                let maxX = r.maxX, maxY = r.maxY
-                                                r.origin.x = min(max(0, r.origin.x + dx), maxX - minSide)
-                                                r.origin.y = min(max(0, r.origin.y + dy), maxY - minSide)
-                                                r.size.width  = max(minSide, maxX - r.origin.x)
-                                                r.size.height = max(minSide, maxY - r.origin.y)
-                                                cropRect = r
-                                            }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    handle(at: CGPoint(x: viewRect.maxX, y: viewRect.minY))
-                                        .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
-                                                let dx = g.translation.width  / scale
-                                                let dy = g.translation.height / scale
-                                                let minX = r.minX
-                                                r.size.width  = max(minSide, min(imageSize.width - minX, r.size.width + dx))
-                                                r.origin.y    = min(max(0, r.origin.y + dy), r.maxY - minSide)
-                                                r.size.height = max(minSide, r.maxY - r.origin.y)
-                                                cropRect = r
-                                            }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    handle(at: CGPoint(x: viewRect.minX, y: viewRect.maxY))
-                                        .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
-                                                let dx = g.translation.width  / scale
-                                                let dy = g.translation.height / scale
-                                                let maxX = r.maxX
-                                                r.origin.x = min(max(0, r.origin.x + dx), maxX - minSide)
-                                                r.size.width  = max(minSide, maxX - r.origin.x)
-                                                r.size.height = max(minSide, min(imageSize.height - r.origin.y, r.size.height + dy))
-                                                cropRect = r
-                                            }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    handle(at: CGPoint(x: viewRect.maxX, y: viewRect.maxY))
-                                        .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
-                                                let dx = g.translation.width  / scale
-                                                let dy = g.translation.height / scale
-                                                r.size.width  = max(minSide, min(imageSize.width  - r.origin.x, r.size.width + dx))
-                                                r.size.height = max(minSide, min(imageSize.height - r.origin.y, r.size.height + dy))
-                                                cropRect = r
-                                            }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    // Mid-edge handles (left, right, top, bottom)
+                                                                        
+                                    // LEFT (Xmin) — width only
                                     handle(at: CGPoint(x: viewRect.minX, y: viewRect.midY))
                                         .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
+                                            DragGesture(minimumDistance: 0).onChanged { g in
+                                                if dragStartRect == nil { dragStartRect = cropRect }
+                                                guard let start = dragStartRect else { return }
                                                 let dx = g.translation.width / scale
-                                                let newX = min(max(0, r.origin.x + dx), r.maxX - minSide)
-                                                let delta = r.origin.x - newX
-                                                r.origin.x = newX
-                                                r.size.width = max(minSide, r.size.width + delta)
+                                                let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
+                                                var r = start
+                                                r.origin.x = newXmin
+                                                r.size.width = max(minSide, start.maxX - newXmin)
                                                 cropRect = r
                                             }
+                                            .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
 
+                                    // RIGHT (Xmax) — width only
                                     handle(at: CGPoint(x: viewRect.maxX, y: viewRect.midY))
                                         .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
+                                            DragGesture(minimumDistance: 0).onChanged { g in
+                                                if dragStartRect == nil { dragStartRect = cropRect }
+                                                guard let start = dragStartRect else { return }
                                                 let dx = g.translation.width / scale
-                                                r.size.width = max(minSide, r.size.width + dx)
-                                                r.size.width = min(r.size.width, imageSize.width - r.origin.x)
+                                                let newXmax = min(imageSize.width, max(start.minX + minSide, start.maxX + dx))
+                                                var r = start
+                                                r.size.width = newXmax - start.minX
                                                 cropRect = r
                                             }
+                                            .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
 
+                                    // TOP (Ymin) — height only
                                     handle(at: CGPoint(x: viewRect.midX, y: viewRect.minY))
                                         .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
+                                            DragGesture(minimumDistance: 0).onChanged { g in
+                                                if dragStartRect == nil { dragStartRect = cropRect }
+                                                guard let start = dragStartRect else { return }
                                                 let dy = g.translation.height / scale
-                                                let newY = min(max(0, r.origin.y + dy), r.maxY - minSide)
-                                                let delta = r.origin.y - newY
-                                                r.origin.y = newY
-                                                r.size.height = max(minSide, r.size.height + delta)
+                                                let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
+                                                var r = start
+                                                r.origin.y = newYmin
+                                                r.size.height = max(minSide, start.maxY - newYmin)
                                                 cropRect = r
                                             }
+                                            .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
 
+                                    // BOTTOM (Ymax) — height only
                                     handle(at: CGPoint(x: viewRect.midX, y: viewRect.maxY))
                                         .highPriorityGesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
+                                            DragGesture(minimumDistance: 0).onChanged { g in
+                                                if dragStartRect == nil { dragStartRect = cropRect }
+                                                guard let start = dragStartRect else { return }
                                                 let dy = g.translation.height / scale
-                                                r.size.height = max(minSide, r.size.height + dy)
-                                                r.size.height = min(r.size.height, imageSize.height - r.origin.y)
+                                                let newYmax = min(imageSize.height, max(start.minY + minSide, start.maxY + dy))
+                                                var r = start
+                                                r.size.height = newYmax - start.minY
                                                 cropRect = r
                                             }
+                                            .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
+
                                 }
                                 .onAppear {
                                     if cropRect == .zero {
@@ -245,73 +201,67 @@ struct ContentView: View {
                     Divider()
                     GroupBox("BBox Inspector (px)") {
                         VStack(alignment: .leading, spacing: 8) {
+                            // Xmin
                             HStack {
-                                Text("x").frame(width: 16, alignment: .trailing)
-                                TextField("x", value: Binding(
-                                    get: { Double(cropRect.origin.x) },
-                                    set: { v in
-                                        let w = Double(cropRect.size.width)
-                                        let imgW = Double(original?.width ?? 0)
-                                        let clamped = max(0, min(v, max(0, imgW - w)))
-                                        cropRect.origin.x = CGFloat(clamped)
-                                    }
+                                Text("Xmin").frame(width: 42, alignment: .trailing)
+                                TextField("Xmin", value: Binding(
+                                    get: { Double(cropRect.minX) },
+                                    set: { v in applyXMin(CGFloat(v)) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudge(dx: 1, dy: 0)
+                                    nudgeXMin(+1)
                                 } onDecrement: {
-                                    nudge(dx: -1, dy: 0)
-                                }.labelsHidden()
+                                    nudgeXMin(-1)
+                                }
+                                .labelsHidden()
                             }
+
+                            // Xmax
                             HStack {
-                                Text("y").frame(width: 16, alignment: .trailing)
-                                TextField("y", value: Binding(
-                                    get: { Double(cropRect.origin.y) },
-                                    set: { v in
-                                        let h = Double(cropRect.size.height)
-                                        let imgH = Double(original?.height ?? 0)
-                                        let clamped = max(0, min(v, max(0, imgH - h)))
-                                        cropRect.origin.y = CGFloat(clamped)
-                                    }
+                                Text("Xmax").frame(width: 42, alignment: .trailing)
+                                TextField("Xmax", value: Binding(
+                                    get: { Double(cropRect.maxX) },
+                                    set: { v in applyXMax(CGFloat(v)) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudge(dx: 0, dy: 1)
+                                    nudgeXMax(+1)
                                 } onDecrement: {
-                                    nudge(dx: 0, dy: -1)
-                                }.labelsHidden()
+                                    nudgeXMax(-1)
+                                }
+                                .labelsHidden()
                             }
+
+                            // Ymin
                             HStack {
-                                Text("w").frame(width: 16, alignment: .trailing)
-                                TextField("w", value: Binding(
-                                    get: { Double(cropRect.size.width) },
-                                    set: { v in
-                                        let imgW = Double(original?.width ?? 0)
-                                        let clamped = max(20, min(v, imgW - Double(cropRect.origin.x)))
-                                        cropRect.size.width = CGFloat(clamped)
-                                    }
+                                Text("Ymin").frame(width: 42, alignment: .trailing)
+                                TextField("Ymin", value: Binding(
+                                    get: { Double(cropRect.minY) },
+                                    set: { v in applyYMin(CGFloat(v)) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    resize(dw: 1, dh: 0)
+                                    nudgeYMin(+1)
                                 } onDecrement: {
-                                    resize(dw: -1, dh: 0)
-                                }.labelsHidden()
+                                    nudgeYMin(-1)
+                                }
+                                .labelsHidden()
                             }
+
+                            // Ymax
                             HStack {
-                                Text("h").frame(width: 16, alignment: .trailing)
-                                TextField("h", value: Binding(
-                                    get: { Double(cropRect.size.height) },
-                                    set: { v in
-                                        let imgH = Double(original?.height ?? 0)
-                                        let clamped = max(20, min(v, imgH - Double(cropRect.origin.y)))
-                                        cropRect.size.height = CGFloat(clamped)
-                                    }
+                                Text("Ymax").frame(width: 42, alignment: .trailing)
+                                TextField("Ymax", value: Binding(
+                                    get: { Double(cropRect.maxY) },
+                                    set: { v in applyYMax(CGFloat(v)) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    resize(dw: 0, dh: 1)
+                                    nudgeYMax(+1)
                                 } onDecrement: {
-                                    resize(dw: 0, dh: -1)
-                                }.labelsHidden()
+                                    nudgeYMax(-1)
+                                }
+                                .labelsHidden()
                             }
-                            Text("Arrows = move 1px  •  ⇧+Arrows = 10px  •  ⌥+Arrows = resize 1px  •  ⌥⇧+Arrows = 10px")
+
+                            Text("Width/height are implied by (Xmin,Xmax,Ymin,Ymax).")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -415,7 +365,54 @@ struct ContentView: View {
         r.size.height = max(minSide, min(r.size.height + dh, CGFloat(cg.height) - r.origin.y))
         cropRect = r
     }
+    // Clamp helpers (use image bounds and minSide)
+    private func applyXMin(_ newXmin: CGFloat) {
+        guard let cg = original else { return }
+        let imgW = CGFloat(cg.width)
+        var r = cropRect
+        let xmax = r.maxX
+        let xmin = max(0, min(newXmin, xmax - minSide))
+        r.origin.x = xmin
+        r.size.width = max(minSide, xmax - xmin)
+        cropRect = r
+    }
 
+    private func applyXMax(_ newXmax: CGFloat) {
+        guard let cg = original else { return }
+        let imgW = CGFloat(cg.width)
+        var r = cropRect
+        let xmin = r.minX
+        let xmax = min(imgW, max(xmin + minSide, newXmax))
+        r.size.width = xmax - xmin
+        cropRect = r
+    }
+
+    private func applyYMin(_ newYmin: CGFloat) {
+        guard let cg = original else { return }
+        let imgH = CGFloat(cg.height)
+        var r = cropRect
+        let ymax = r.maxY
+        let ymin = max(0, min(newYmin, ymax - minSide))
+        r.origin.y = ymin
+        r.size.height = max(minSide, ymax - ymin)
+        cropRect = r
+    }
+
+    private func applyYMax(_ newYmax: CGFloat) {
+        guard let cg = original else { return }
+        let imgH = CGFloat(cg.height)
+        var r = cropRect
+        let ymin = r.minY
+        let ymax = min(imgH, max(ymin + minSide, newYmax))
+        r.size.height = ymax - ymin
+        cropRect = r
+    }
+
+    // Steppers / keyboard helpers
+    private func nudgeXMin(_ amount: CGFloat) { applyXMin(cropRect.minX + amount) }
+    private func nudgeXMax(_ amount: CGFloat) { applyXMax(cropRect.maxX + amount) }
+    private func nudgeYMin(_ amount: CGFloat) { applyYMin(cropRect.minY + amount) }
+    private func nudgeYMax(_ amount: CGFloat) { applyYMax(cropRect.maxY + amount) }
     // Visible, easy-to-hit resize handle
     @ViewBuilder
     private func handle(at p: CGPoint) -> some View {
