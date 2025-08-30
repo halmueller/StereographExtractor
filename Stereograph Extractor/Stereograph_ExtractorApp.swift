@@ -12,6 +12,12 @@ struct Stereograph_ExtractorApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .frame(minWidth: 980, minHeight: 640)
+        }
+        // Optional: customize menus (leave New/Close as-is, keep your own Open/Save in UI)
+        .commands {
+            CommandGroup(replacing: .newItem) { /* no File > New */ }
+            // You can also add custom menu items here if you want to trigger actions via Notifications
         }
     }
 }

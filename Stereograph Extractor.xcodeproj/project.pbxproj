@@ -29,9 +29,22 @@
 		2B75227A2E63A09A007BB920 /* Stereograph ExtractorUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Stereograph ExtractorUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		2B75228F2E63A278007BB920 /* Exceptions for "Stereograph Extractor" folder in "Stereograph Extractor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				SingleFile.swift,
+			);
+			target = 2B7522622E63A099007BB920 /* Stereograph Extractor */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		2B7522652E63A099007BB920 /* Stereograph Extractor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				2B75228F2E63A278007BB920 /* Exceptions for "Stereograph Extractor" folder in "Stereograph Extractor" target */,
+			);
 			path = "Stereograph Extractor";
 			sourceTree = "<group>";
 		};
