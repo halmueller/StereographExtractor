@@ -12,6 +12,7 @@ import CoreGraphics
 
 struct ContentView: View {
     @State private var original: CGImage?
+    @State private var originalInputURL: URL?
     @State private var cropRect: CGRect = .zero
     @State private var params = SegmentParams()
     @State private var showMask = false
@@ -185,6 +186,7 @@ struct ContentView: View {
     private func openImage() {
         if let url = pickImageURL(),
            let cg = cgImageFromURL(url) {
+            originalInputURL = url
             original = cg
             runSegmentation()
         }
@@ -204,9 +206,9 @@ struct ContentView: View {
         guard let cg = original else { return }
         do {
             let cropped = try applyCrop(original: cg, cropRect: cropRect)
-            let type: UTType = .jpeg
-            if let url = pickSaveURL(type: type) {
-                try saveImage(cropped, to: url, type: type, quality: 0.95)
+            let chosenType: UTType = /* pick based on user or original */ .jpeg
+            if let url = pickSaveURL(suggestingFrom: originalInputURL, type: chosenType) {
+                try saveImage(cropped, to: url, type: chosenType, quality: 0.95)
             }
         } catch {
             NSAlert(error: error as NSError).runModal()

@@ -11,9 +11,38 @@ import ImageIO
 import CoreGraphics
 import Foundation
 
+import AppKit
+import UniformTypeIdentifiers
+
 extension UTType {
-    /// JPEG 2000 (JP2) identifier recognized by CoreGraphics / ImageIO
     static let jpeg2000 = UTType(importedAs: "public.jpeg-2000")
+}
+
+func pickSaveURL(suggestingFrom inputURL: URL?, type: UTType?) -> URL? {
+    let panel = NSSavePanel()
+    // Choose a default content type
+    let chosenType: UTType = type ?? {
+        switch inputURL?.pathExtension.lowercased() {
+        case "jp2", "j2k": return .jpeg2000
+        case "png":        return .png
+        case "tif", "tiff":return .tiff
+        case "heic":       return .heic
+        default:           return .jpeg
+        }
+    }()
+
+    panel.allowedContentTypes = [chosenType]
+
+    // Suggest "<input>_cropped.<ext>"
+    if let src = inputURL {
+        let base = src.deletingPathExtension().lastPathComponent
+        let ext  = (chosenType.preferredFilenameExtension) ?? src.pathExtension
+        panel.nameFieldStringValue = "\(base)_cropped.\(ext)"
+    } else {
+        panel.nameFieldStringValue = "image_cropped." + (chosenType.preferredFilenameExtension ?? "jpg")
+    }
+
+    return panel.runModal() == .OK ? panel.url : nil
 }
 
 // Open panel
