@@ -15,6 +15,7 @@ struct SegControlsView: View {
         ScrollView {
             Group {
                 Text("Yellow (HSV)").font(.headline)
+                    .help("Yellowed border hues with minimum saturation and brightness thresholds.")
                 slider("H low", value: $params.hYellowLow, 0, 1)
                 slider("H high", value: $params.hYellowHigh, 0, 1)
                 slider("S min", value: $params.sYellowMin, 0, 1)
@@ -23,10 +24,14 @@ struct SegControlsView: View {
 
             Group {
                 Text("Paper (HSV)").font(.headline)
+                    .help("Paper = low saturation and high value. S slider is a MAX threshold.")
                 slider("H low", value: $params.hPaperLow, 0, 1)
                 slider("H high", value: $params.hPaperHigh, 0, 1)
-                slider("S min", value: $params.sPaperMin, 0, 1)
+                slider("S max", value: $params.sPaperMin, 0, 1)
                 slider("V min", value: $params.vPaperMin, 0, 1)
+                Text("Paper = low saturation (S ≤ S max) and bright (V ≥ V min). Yellow uses a narrow hue band with S/V minimums.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }.padding(.bottom, 8)
 
             Group {
@@ -53,6 +58,25 @@ struct SegControlsView: View {
                 slider("biasTop", value: $params.postBiasTopFrac, -0.03, 0.03, step: 0.001)
                 slider("biasBottom", value: $params.postBiasBottomFrac, -0.03, 0.03, step: 0.001)
             }
+
+            Button {
+                // Data-driven recommended seeds
+                params.hYellowLow  = 0.088
+                params.hYellowHigh = 0.138
+                params.sYellowMin  = 0.26
+                params.vYellowMin  = 0.40
+
+                params.hPaperLow   = 0.0
+                params.hPaperHigh  = 1.0
+                params.sPaperMin   = 0.25    // S ≤ 0.25 is paper
+                params.vPaperMin   = 0.85
+                onResegment()
+            } label: {
+                Label("Reset to recommended", systemImage: "arrow.counterclockwise")
+            }
+            .buttonStyle(.bordered)
+            .tint(.secondary)
+            .padding(.top, 4)
 
             Button {
                 onResegment()

@@ -14,17 +14,17 @@ import AppKit
 // MARK: - Tunable Parameters (same defaults as before)
 
 public struct SegmentParams: Equatable {
-    // Yellow (HSV)
-    public var hYellowLow: Float = 12.0/255.0
-    public var hYellowHigh: Float = 58.0/255.0
-    public var sYellowMin: Float = 48.0/255.0
-    public var vYellowMin: Float = 58.0/255.0
+    // Yellow (HSV) — data-driven seeds
+    public var hYellowLow: Float = 0.088
+    public var hYellowHigh: Float = 0.138
+    public var sYellowMin: Float = 0.26
+    public var vYellowMin: Float = 0.40
 
-    // Paper (HSV)
-    public var hPaperLow: Float  = 8.0/255.0
-    public var hPaperHigh: Float = 64.0/255.0
-    public var sPaperMin: Float  = 25.0/255.0
-    public var vPaperMin: Float  = 70.0/255.0
+    // Paper (HSV) — treat sPaperMin as a MAX saturation limit (<=), v as bright
+    public var hPaperLow: Float  = 0.0
+    public var hPaperHigh: Float = 1.0
+    public var sPaperMin: Float  = 0.25   // interpreted as S <= sPaperMin
+    public var vPaperMin: Float  = 0.85
 
     // Edge scan
     public var maxScanFrac: Float = 0.30
@@ -113,8 +113,9 @@ public func buildMask(input: CGImage, params: SegmentParams) throws -> (mask: [U
 
             let isYellow = (h >= params.hYellowLow && h <= params.hYellowHigh &&
                             s >= params.sYellowMin && v >= params.vYellowMin)
+            // Interpret sPaperMin as a MAX saturation threshold (paper is low-sat, bright)
             let isPaper  = (h >= params.hPaperLow && h <= params.hPaperHigh &&
-                            s >= params.sPaperMin && v >= params.vPaperMin)
+                            s <= params.sPaperMin && v >= params.vPaperMin)
 
             mask[mRow + x] = (isYellow || isPaper) ? 255 : 0
             idx += 4
