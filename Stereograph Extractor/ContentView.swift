@@ -19,7 +19,6 @@ struct ContentView: View {
     @State private var debugCG: CGImage?
     @State private var fallbackUsed = false
     @State private var keyMonitor: Any?
-    @State private var dragStartRect: CGRect?
     
     private let numFmt: NumberFormatter = {
         let f = NumberFormatter()
@@ -29,7 +28,6 @@ struct ContentView: View {
     }()
     
     // Resize handle settings
-    private let handleSize: CGFloat = 18
     private let minSide: CGFloat = 20
     
     var body: some View {
@@ -43,138 +41,9 @@ struct ContentView: View {
                                                    size: .init(width: maskCG.width, height: maskCG.height)))
                             .resizable().interpolation(.high).scaledToFit()
                         } else {
-                            // Always show the editor so the red box and handles are live
-                            GeometryReader { geo in
-                                // (keep your existing editor code here: image, red rect, handles, gestures)
-                                let imageSize = CGSize(width: cg.width, height: cg.height)
-                                let scale = min(geo.size.width / imageSize.width, geo.size.height / imageSize.height)
-                                let drawSize = CGSize(width: imageSize.width * scale, height: imageSize.height * scale)
-                                let origin = CGPoint(x: (geo.size.width - drawSize.width) / 2.0,
-                                                     y: (geo.size.height - drawSize.height) / 2.0)
-                                
-                                
-                                let nsimg = NSImage(cgImage: cg, size: .init(width: cg.width, height: cg.height))
-                                
-                                ZStack(alignment: .topLeading) {
-                                    // Base image
-                                    Image(nsImage: nsimg)
-                                        .resizable()
-                                        .interpolation(.high)
-                                        .frame(width: drawSize.width, height: drawSize.height)
-                                        .position(x: origin.x + drawSize.width/2, y: origin.y + drawSize.height/2)
-                                        .zIndex(0)
-                                        .allowsHitTesting(false)
-
-                                    // Convert image-space cropRect to view-space
-                                    let viewRect = CGRect(
-                                        x: origin.x + cropRect.minX * scale,
-                                        y: origin.y + cropRect.minY * scale,
-                                        width: cropRect.width * scale,
-                                        height: cropRect.height * scale
-                                    )
-                                    
-                                    // Stroke + translucent fill (don’t steal gestures)
-                                    Path { $0.addRect(viewRect) }
-                                        .stroke(Color.red, lineWidth: max(2, drawSize.width * 0.002))
-                                        .zIndex(1)
-                                        .allowsHitTesting(false)
-                                    // Corner guide brackets
-                                    cornerBracket(rect: viewRect, length: max(10, viewRect.width * 0.03), thickness: 2)
-                                        .stroke(Color.white, lineWidth: 2)
-                                        .shadow(radius: 1)
-                                        .zIndex(1)
-                                        .allowsHitTesting(false)
-                                    cornerBracket(rect: viewRect, length: max(10, viewRect.width * 0.03), thickness: 1)
-                                        .stroke(Color.red, lineWidth: 1)
-                                        .zIndex(1)
-                                        .allowsHitTesting(false)
-                                    Path { $0.addRect(viewRect) }
-                                        .fill(Color.red.opacity(0.12))
-                                        .allowsHitTesting(false)
-                                        .zIndex(1)
-                                    
-                                    // LEFT (Xmin) — width only
-                                    handle(at: CGPoint(x: viewRect.minX, y: viewRect.midY))
-                                        .gesture(
-                                            DragGesture(minimumDistance: 0)
-                                                .onChanged { g in
-                                                    if dragStartRect == nil { dragStartRect = cropRect }
-                                                    guard let start = dragStartRect else { return }
-                                                    let dx = g.translation.width / scale
-                                                    let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
-                                                    var r = start
-                                                    r.origin.x = newXmin
-                                                    r.size.width = max(minSide, start.maxX - newXmin)
-                                                    cropRect = r
-                                                }
-                                                .onEnded { _ in dragStartRect = nil }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    // RIGHT (Xmax) — width only
-                                    handle(at: CGPoint(x: viewRect.maxX, y: viewRect.midY))
-                                        .gesture(
-                                            DragGesture(minimumDistance: 0)
-                                                .onChanged { g in
-                                                    if dragStartRect == nil { dragStartRect = cropRect }
-                                                    guard let start = dragStartRect else { return }
-                                                    let dx = g.translation.width / scale
-                                                    let newXmax = min(imageSize.width, max(start.minX + minSide, start.maxX + dx))
-                                                    var r = start
-                                                    r.size.width = newXmax - start.minX
-                                                    cropRect = r
-                                                }
-                                                .onEnded { _ in dragStartRect = nil }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    // TOP (Ymin) — height only
-                                    handle(at: CGPoint(x: viewRect.midX, y: viewRect.minY))
-                                        .gesture(
-                                            DragGesture(minimumDistance: 0)
-                                                .onChanged { g in
-                                                    if dragStartRect == nil { dragStartRect = cropRect }
-                                                    guard let start = dragStartRect else { return }
-                                                    let dy = g.translation.height / scale
-                                                    let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
-                                                    var r = start
-                                                    r.origin.y = newYmin
-                                                    r.size.height = max(minSide, start.maxY - newYmin)
-                                                    cropRect = r
-                                                }
-                                                .onEnded { _ in dragStartRect = nil }
-                                        )
-                                        .zIndex(3)
-                                    
-                                    // BOTTOM (Ymax) — height only
-                                    handle(at: CGPoint(x: viewRect.midX, y: viewRect.maxY))
-                                        .gesture(
-                                            DragGesture(minimumDistance: 0)
-                                                .onChanged { g in
-                                                    if dragStartRect == nil { dragStartRect = cropRect }
-                                                    guard let start = dragStartRect else { return }
-                                                    let dy = g.translation.height / scale
-                                                    let newYmax = min(imageSize.height, max(start.minY + minSide, start.maxY + dy))
-                                                    var r = start
-                                                    r.size.height = newYmax - start.minY
-                                                    cropRect = r
-                                                }
-                                                .onEnded { _ in dragStartRect = nil }
-                                        )
-                                        .zIndex(3)
-                                    
-                                }
-                                .onAppear {
-                                    if cropRect == .zero {
-                                        // initialize to a centered box if segment hasn't run yet
-                                        let w = imageSize.width * 0.7
-                                        let h = imageSize.height * 0.7
-                                        let x = (imageSize.width - w) / 2
-                                        let y = (imageSize.height - h) / 2
-                                        cropRect = CGRect(x: x, y: y, width: w, height: h)
-                                    }
-                                }
-                            }                        }
+                            // Use dedicated CropAdjustView for editing
+                            CropAdjustView(original: cg, cropRect: $cropRect)
+                        }
                     } else {
                         Text("Open an image (⌘O)").foregroundStyle(.secondary)
                     }
@@ -408,45 +277,6 @@ struct ContentView: View {
     private func nudgeXMax(_ amount: CGFloat) { applyXMax(cropRect.maxX + amount) }
     private func nudgeYMin(_ amount: CGFloat) { applyYMin(cropRect.minY + amount) }
     private func nudgeYMax(_ amount: CGFloat) { applyYMax(cropRect.maxY + amount) }
-    // Visible, easy-to-hit resize handle
-    @ViewBuilder
-    private func handle(at p: CGPoint) -> some View {
-        ZStack {
-            Circle().fill(Color.black.opacity(0.85))
-            Circle().stroke(Color.white, lineWidth: 2)
-            Circle().stroke(Color.red, lineWidth: 1)
-        }
-        .frame(width: handleSize * 1.5, height: handleSize * 1.5)
-        .shadow(color: .black.opacity(0.5), radius: 3, x: 0, y: 0)
-        .position(p)
-        .contentShape(Rectangle())
-        .allowsHitTesting(true)
-        .zIndex(10)
-    }
-    
-    // Draw small "L" brackets at each corner of the rect
-    private func cornerBracket(rect: CGRect, length: CGFloat, thickness: CGFloat) -> Path {
-        var path = Path()
-        let x0 = rect.minX, y0 = rect.minY
-        let x1 = rect.maxX, y1 = rect.maxY
-        // TL
-        path.move(to: CGPoint(x: x0, y: y0 + length))
-        path.addLine(to: CGPoint(x: x0, y: y0))
-        path.addLine(to: CGPoint(x: x0 + length, y: y0))
-        // TR
-        path.move(to: CGPoint(x: x1 - length, y: y0))
-        path.addLine(to: CGPoint(x: x1, y: y0))
-        path.addLine(to: CGPoint(x: x1, y: y0 + length))
-        // BL
-        path.move(to: CGPoint(x: x0, y: y1 - length))
-        path.addLine(to: CGPoint(x: x0, y: y1))
-        path.addLine(to: CGPoint(x: x0 + length, y: y1))
-        // BR
-        path.move(to: CGPoint(x: x1 - length, y: y1))
-        path.addLine(to: CGPoint(x: x1, y: y1))
-        path.addLine(to: CGPoint(x: x1, y: y1 - length))
-        return path
-    }
     
     // MARK: - Inset-based helpers (pixels from each image edge) — Double API for unambiguous TextField bindings
     private func applyLeftInset(_ left: Double) {

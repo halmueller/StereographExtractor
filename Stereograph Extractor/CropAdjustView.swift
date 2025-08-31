@@ -12,6 +12,8 @@ struct CropAdjustView: View {
     let original: CGImage
     @Binding var cropRect: CGRect   // in image pixels
     @State private var dragStartRect: CGRect?
+    @State private var activeEdge: Edge? = nil
+    private enum Edge { case left, right, top, bottom }
 
     // tweak as you like
     private let handleSize: CGFloat = 18
@@ -58,70 +60,92 @@ struct CropAdjustView: View {
 
                 // Mid-edge handles (adjust one edge only)
                 cornerHandle(at: CGPoint(x: viewRect.minX, y: viewRect.midY))
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { g in
-                                if dragStartRect == nil { dragStartRect = cropRect }
-                                guard let start = dragStartRect else { return }
-                                let dx = g.translation.width / scale
-                                let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
-                                var r = start
-                                r.origin.x = newXmin
-                                r.size.width = max(minSide, start.maxX - newXmin)
-                                cropRect = r
-                            }
-                            .onEnded { _ in dragStartRect = nil }
-                    )
                     .zIndex(3)
+                    .allowsHitTesting(false)
 
                 cornerHandle(at: CGPoint(x: viewRect.maxX, y: viewRect.midY))
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { g in
-                                if dragStartRect == nil { dragStartRect = cropRect }
-                                guard let start = dragStartRect else { return }
-                                let dx = g.translation.width / scale
-                                let newXmax = min(imgSize.width, max(start.minX + minSide, start.maxX + dx))
-                                var r = start
-                                r.size.width = newXmax - start.minX
-                                cropRect = r
-                            }
-                            .onEnded { _ in dragStartRect = nil }
-                    )
                     .zIndex(3)
+                    .allowsHitTesting(false)
 
                 cornerHandle(at: CGPoint(x: viewRect.midX, y: viewRect.minY))
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { g in
-                                if dragStartRect == nil { dragStartRect = cropRect }
-                                guard let start = dragStartRect else { return }
-                                let dy = g.translation.height / scale
-                                let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
-                                var r = start
-                                r.origin.y = newYmin
-                                r.size.height = max(minSide, start.maxY - newYmin)
-                                cropRect = r
-                            }
-                            .onEnded { _ in dragStartRect = nil }
-                    )
                     .zIndex(3)
+                    .allowsHitTesting(false)
 
                 cornerHandle(at: CGPoint(x: viewRect.midX, y: viewRect.maxY))
+                    .zIndex(3)
+                    .allowsHitTesting(false)
+
+                // Transparent overlay that listens for drags that START on a handle only
+                Color.clear
+                    .contentShape(Rectangle())
                     .gesture(
                         DragGesture(minimumDistance: 0)
                             .onChanged { g in
+                                // Snapshot starting rect & choose active edge on first movement
                                 if dragStartRect == nil { dragStartRect = cropRect }
                                 guard let start = dragStartRect else { return }
-                                let dy = g.translation.height / scale
-                                let newYmax = min(imgSize.height, max(start.minY + minSide, start.maxY + dy))
-                                var r = start
-                                r.size.height = newYmax - start.minY
-                                cropRect = r
+
+                                // Determine active edge at drag start
+                                if activeEdge == nil {
+                                    let p = g.startLocation
+                                    // Build handle hit-rects in view-space (centered at the same points we draw handles)
+                                    let leftCenter   = CGPoint(x: viewRect.minX, y: viewRect.midY)
+                                    let rightCenter  = CGPoint(x: viewRect.maxX, y: viewRect.midY)
+                                    let topCenter    = CGPoint(x: viewRect.midX, y: viewRect.minY)
+                                    let bottomCenter = CGPoint(x: viewRect.midX, y: viewRect.maxY)
+                                    let hs = handleSize
+                                    let leftRect   = CGRect(x: leftCenter.x - hs/2, y: leftCenter.y - hs/2, width: hs, height: hs)
+                                    let rightRect  = CGRect(x: rightCenter.x - hs/2, y: rightCenter.y - hs/2, width: hs, height: hs)
+                                    let topRect    = CGRect(x: topCenter.x - hs/2, y: topCenter.y - hs/2, width: hs, height: hs)
+                                    let bottomRect = CGRect(x: bottomCenter.x - hs/2, y: bottomCenter.y - hs/2, width: hs, height: hs)
+
+                                    if leftRect.contains(p)   { activeEdge = .left }
+                                    else if rightRect.contains(p)  { activeEdge = .right }
+                                    else if topRect.contains(p)    { activeEdge = .top }
+                                    else if bottomRect.contains(p) { activeEdge = .bottom }
+                                    else { activeEdge = nil }
+                                }
+
+                                guard let edge = activeEdge else { return }
+
+                                switch edge {
+                                case .left:
+                                    let dx = g.translation.width / scale
+                                    let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
+                                    var r = start
+                                    r.origin.x = newXmin
+                                    r.size.width = max(minSide, start.maxX - newXmin)
+                                    cropRect = r
+
+                                case .right:
+                                    let dx = g.translation.width / scale
+                                    let newXmax = min(imgSize.width, max(start.minX + minSide, start.maxX + dx))
+                                    var r = start
+                                    r.size.width = newXmax - start.minX
+                                    cropRect = r
+
+                                case .top:
+                                    let dy = g.translation.height / scale
+                                    let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
+                                    var r = start
+                                    r.origin.y = newYmin
+                                    r.size.height = max(minSide, start.maxY - newYmin)
+                                    cropRect = r
+
+                                case .bottom:
+                                    let dy = g.translation.height / scale
+                                    let newYmax = min(imgSize.height, max(start.minY + minSide, start.maxY + dy))
+                                    var r = start
+                                    r.size.height = newYmax - start.minY
+                                    cropRect = r
+                                }
                             }
-                            .onEnded { _ in dragStartRect = nil }
+                            .onEnded { _ in
+                                dragStartRect = nil
+                                activeEdge = nil
+                            }
                     )
-                    .zIndex(3)
+                    .zIndex(4) // above visuals
             }
         }
     }
@@ -130,13 +154,13 @@ struct CropAdjustView: View {
 
     @ViewBuilder
     private func cornerHandle(at p: CGPoint) -> some View {
-        // high-contrast square handle with border & shadow
         Rectangle()
             .fill(Color.white)
             .overlay(Rectangle().stroke(Color.black.opacity(0.7), lineWidth: 1))
             .frame(width: handleSize, height: handleSize)
             .shadow(radius: 1, x: 0, y: 0)
             .position(p)
-            .contentShape(Rectangle())  // ensure easy hit area
+            .contentShape(Rectangle())
+            .allowsHitTesting(false)
     }
 }
