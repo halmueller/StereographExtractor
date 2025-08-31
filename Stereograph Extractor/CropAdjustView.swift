@@ -11,6 +11,7 @@ import SwiftUI
 struct CropAdjustView: View {
     let original: CGImage
     @Binding var cropRect: CGRect   // in image pixels
+    @State private var dragStartRect: CGRect?
 
     // tweak as you like
     private let handleSize: CGFloat = 18
@@ -34,6 +35,7 @@ struct CropAdjustView: View {
                     .frame(width: drawSize.width, height: drawSize.height)
                     .position(x: origin.x + drawSize.width/2, y: origin.y + drawSize.height/2)
                     .zIndex(0)
+                    .allowsHitTesting(false)
 
                 // Crop rect (image -> view coords)
                 let viewRect = CGRect(
@@ -47,34 +49,79 @@ struct CropAdjustView: View {
                 Path { $0.addRect(viewRect) }
                     .stroke(Color.red, lineWidth: max(2, drawSize.width * 0.002))
                     .zIndex(1)
+                    .allowsHitTesting(false)
 
                 Path { $0.addRect(viewRect) }
                     .fill(Color.red.opacity(0.12))
                     .allowsHitTesting(false)   // don’t block handles
                     .zIndex(1)
 
-                // Corner handles (above everything)
-                cornerHandle(at: CGPoint(x: viewRect.minX, y: viewRect.minY))
-                    .highPriorityGesture(resizeTL(scale: scale, imageSize: imgSize))
-                    .zIndex(3)
-                cornerHandle(at: CGPoint(x: viewRect.maxX, y: viewRect.minY))
-                    .highPriorityGesture(resizeTR(scale: scale, imageSize: imgSize))
-                    .zIndex(3)
-                cornerHandle(at: CGPoint(x: viewRect.minX, y: viewRect.maxY))
-                    .highPriorityGesture(resizeBL(scale: scale, imageSize: imgSize))
-                    .zIndex(3)
-                cornerHandle(at: CGPoint(x: viewRect.maxX, y: viewRect.maxY))
-                    .highPriorityGesture(resizeBR(scale: scale, imageSize: imgSize))
+                // Mid-edge handles (adjust one edge only)
+                cornerHandle(at: CGPoint(x: viewRect.minX, y: viewRect.midY))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { g in
+                                if dragStartRect == nil { dragStartRect = cropRect }
+                                guard let start = dragStartRect else { return }
+                                let dx = g.translation.width / scale
+                                let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
+                                var r = start
+                                r.origin.x = newXmin
+                                r.size.width = max(minSide, start.maxX - newXmin)
+                                cropRect = r
+                            }
+                            .onEnded { _ in dragStartRect = nil }
+                    )
                     .zIndex(3)
 
-                // Drag whole rect (below handles, above fill)
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .frame(width: viewRect.width, height: viewRect.height)
-                    .position(x: viewRect.midX, y: viewRect.midY)
-                    .gesture(dragWhole(scale: scale, imageSize: imgSize))
-                    .zIndex(2)
+                cornerHandle(at: CGPoint(x: viewRect.maxX, y: viewRect.midY))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { g in
+                                if dragStartRect == nil { dragStartRect = cropRect }
+                                guard let start = dragStartRect else { return }
+                                let dx = g.translation.width / scale
+                                let newXmax = min(imgSize.width, max(start.minX + minSide, start.maxX + dx))
+                                var r = start
+                                r.size.width = newXmax - start.minX
+                                cropRect = r
+                            }
+                            .onEnded { _ in dragStartRect = nil }
+                    )
+                    .zIndex(3)
+
+                cornerHandle(at: CGPoint(x: viewRect.midX, y: viewRect.minY))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { g in
+                                if dragStartRect == nil { dragStartRect = cropRect }
+                                guard let start = dragStartRect else { return }
+                                let dy = g.translation.height / scale
+                                let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
+                                var r = start
+                                r.origin.y = newYmin
+                                r.size.height = max(minSide, start.maxY - newYmin)
+                                cropRect = r
+                            }
+                            .onEnded { _ in dragStartRect = nil }
+                    )
+                    .zIndex(3)
+
+                cornerHandle(at: CGPoint(x: viewRect.midX, y: viewRect.maxY))
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { g in
+                                if dragStartRect == nil { dragStartRect = cropRect }
+                                guard let start = dragStartRect else { return }
+                                let dy = g.translation.height / scale
+                                let newYmax = min(imgSize.height, max(start.minY + minSide, start.maxY + dy))
+                                var r = start
+                                r.size.height = newYmax - start.minY
+                                cropRect = r
+                            }
+                            .onEnded { _ in dragStartRect = nil }
+                    )
+                    .zIndex(3)
             }
         }
     }
@@ -91,69 +138,5 @@ struct CropAdjustView: View {
             .shadow(radius: 1, x: 0, y: 0)
             .position(p)
             .contentShape(Rectangle())  // ensure easy hit area
-    }
-
-    // MARK: - Gestures
-
-    private func dragWhole(scale: CGFloat, imageSize: CGSize) -> some Gesture {
-        DragGesture().onChanged { g in
-            var r = cropRect
-            let dx = g.translation.width  / scale
-            let dy = g.translation.height / scale
-            r.origin.x = max(0, min(r.origin.x + dx, imageSize.width  - r.width))
-            r.origin.y = max(0, min(r.origin.y + dy, imageSize.height - r.height))
-            cropRect = r
-        }
-    }
-
-    private func resizeTL(scale: CGFloat, imageSize: CGSize) -> some Gesture {
-        DragGesture().onChanged { g in
-            var r = cropRect
-            let dx = g.translation.width  / scale
-            let dy = g.translation.height / scale
-            let maxX = r.maxX, maxY = r.maxY
-            r.origin.x = min(max(0, r.origin.x + dx), maxX - minSide)
-            r.origin.y = min(max(0, r.origin.y + dy), maxY - minSide)
-            r.size.width  = max(minSide, maxX - r.origin.x)
-            r.size.height = max(minSide, maxY - r.origin.y)
-            cropRect = r
-        }
-    }
-
-    private func resizeTR(scale: CGFloat, imageSize: CGSize) -> some Gesture {
-        DragGesture().onChanged { g in
-            var r = cropRect
-            let dx = g.translation.width  / scale
-            let dy = g.translation.height / scale
-            let minX = r.minX
-            r.size.width  = max(minSide, min(imageSize.width - minX, r.size.width + dx))
-            r.origin.y    = min(max(0, r.origin.y + dy), r.maxY - minSide)
-            r.size.height = max(minSide, r.maxY - r.origin.y)
-            cropRect = r
-        }
-    }
-
-    private func resizeBL(scale: CGFloat, imageSize: CGSize) -> some Gesture {
-        DragGesture().onChanged { g in
-            var r = cropRect
-            let dx = g.translation.width  / scale
-            let dy = g.translation.height / scale
-            let maxX = r.maxX
-            r.origin.x = min(max(0, r.origin.x + dx), maxX - minSide)
-            r.size.width  = max(minSide, maxX - r.origin.x)
-            r.size.height = max(minSide, min(imageSize.height - r.origin.y, r.size.height + dy))
-            cropRect = r
-        }
-    }
-
-    private func resizeBR(scale: CGFloat, imageSize: CGSize) -> some Gesture {
-        DragGesture().onChanged { g in
-            var r = cropRect
-            let dx = g.translation.width  / scale
-            let dy = g.translation.height / scale
-            r.size.width  = max(minSide, min(imageSize.width  - r.origin.x, r.size.width + dx))
-            r.size.height = max(minSide, min(imageSize.height - r.origin.y, r.size.height + dy))
-            cropRect = r
-        }
     }
 }

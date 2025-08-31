@@ -8,6 +8,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import AppKit
+import CoreGraphics
 
 struct ContentView: View {
     @State private var original: CGImage?
@@ -40,7 +41,7 @@ struct ContentView: View {
                         if showMask, let maskCG {
                             Image(nsImage: NSImage(cgImage: maskCG,
                                                    size: .init(width: maskCG.width, height: maskCG.height)))
-                                .resizable().interpolation(.high).scaledToFit()
+                            .resizable().interpolation(.high).scaledToFit()
                         } else {
                             // Always show the editor so the red box and handles are live
                             GeometryReader { geo in
@@ -62,7 +63,8 @@ struct ContentView: View {
                                         .frame(width: drawSize.width, height: drawSize.height)
                                         .position(x: origin.x + drawSize.width/2, y: origin.y + drawSize.height/2)
                                         .zIndex(0)
-                                    
+                                        .allowsHitTesting(false)
+
                                     // Convert image-space cropRect to view-space
                                     let viewRect = CGRect(
                                         x: origin.x + cropRect.minX * scale,
@@ -75,103 +77,92 @@ struct ContentView: View {
                                     Path { $0.addRect(viewRect) }
                                         .stroke(Color.red, lineWidth: max(2, drawSize.width * 0.002))
                                         .zIndex(1)
+                                        .allowsHitTesting(false)
                                     // Corner guide brackets
                                     cornerBracket(rect: viewRect, length: max(10, viewRect.width * 0.03), thickness: 2)
                                         .stroke(Color.white, lineWidth: 2)
                                         .shadow(radius: 1)
                                         .zIndex(1)
+                                        .allowsHitTesting(false)
                                     cornerBracket(rect: viewRect, length: max(10, viewRect.width * 0.03), thickness: 1)
                                         .stroke(Color.red, lineWidth: 1)
                                         .zIndex(1)
+                                        .allowsHitTesting(false)
                                     Path { $0.addRect(viewRect) }
                                         .fill(Color.red.opacity(0.12))
                                         .allowsHitTesting(false)
                                         .zIndex(1)
                                     
-                                    // Drag the whole rect
-                                    Rectangle()
-                                        .fill(Color.clear)
-                                        .contentShape(Rectangle())
-                                        .frame(width: viewRect.width, height: viewRect.height)
-                                        .position(x: viewRect.midX, y: viewRect.midY)
-                                        .gesture(
-                                            DragGesture().onChanged { g in
-                                                var r = cropRect
-                                                let dx = g.translation.width  / scale
-                                                let dy = g.translation.height / scale
-                                                r.origin.x = max(0, min(r.origin.x + dx, imageSize.width  - r.width))
-                                                r.origin.y = max(0, min(r.origin.y + dy, imageSize.height - r.height))
-                                                cropRect = r
-                                            }
-                                        )
-                                        .zIndex(2)
-                                                                        
                                     // LEFT (Xmin) — width only
                                     handle(at: CGPoint(x: viewRect.minX, y: viewRect.midY))
-                                        .highPriorityGesture(
-                                            DragGesture(minimumDistance: 0).onChanged { g in
-                                                if dragStartRect == nil { dragStartRect = cropRect }
-                                                guard let start = dragStartRect else { return }
-                                                let dx = g.translation.width / scale
-                                                let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
-                                                var r = start
-                                                r.origin.x = newXmin
-                                                r.size.width = max(minSide, start.maxX - newXmin)
-                                                cropRect = r
-                                            }
-                                            .onEnded { _ in dragStartRect = nil }
+                                        .gesture(
+                                            DragGesture(minimumDistance: 0)
+                                                .onChanged { g in
+                                                    if dragStartRect == nil { dragStartRect = cropRect }
+                                                    guard let start = dragStartRect else { return }
+                                                    let dx = g.translation.width / scale
+                                                    let newXmin = max(0, min(start.minX + dx, start.maxX - minSide))
+                                                    var r = start
+                                                    r.origin.x = newXmin
+                                                    r.size.width = max(minSide, start.maxX - newXmin)
+                                                    cropRect = r
+                                                }
+                                                .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
-
+                                    
                                     // RIGHT (Xmax) — width only
                                     handle(at: CGPoint(x: viewRect.maxX, y: viewRect.midY))
-                                        .highPriorityGesture(
-                                            DragGesture(minimumDistance: 0).onChanged { g in
-                                                if dragStartRect == nil { dragStartRect = cropRect }
-                                                guard let start = dragStartRect else { return }
-                                                let dx = g.translation.width / scale
-                                                let newXmax = min(imageSize.width, max(start.minX + minSide, start.maxX + dx))
-                                                var r = start
-                                                r.size.width = newXmax - start.minX
-                                                cropRect = r
-                                            }
-                                            .onEnded { _ in dragStartRect = nil }
+                                        .gesture(
+                                            DragGesture(minimumDistance: 0)
+                                                .onChanged { g in
+                                                    if dragStartRect == nil { dragStartRect = cropRect }
+                                                    guard let start = dragStartRect else { return }
+                                                    let dx = g.translation.width / scale
+                                                    let newXmax = min(imageSize.width, max(start.minX + minSide, start.maxX + dx))
+                                                    var r = start
+                                                    r.size.width = newXmax - start.minX
+                                                    cropRect = r
+                                                }
+                                                .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
-
+                                    
                                     // TOP (Ymin) — height only
                                     handle(at: CGPoint(x: viewRect.midX, y: viewRect.minY))
-                                        .highPriorityGesture(
-                                            DragGesture(minimumDistance: 0).onChanged { g in
-                                                if dragStartRect == nil { dragStartRect = cropRect }
-                                                guard let start = dragStartRect else { return }
-                                                let dy = g.translation.height / scale
-                                                let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
-                                                var r = start
-                                                r.origin.y = newYmin
-                                                r.size.height = max(minSide, start.maxY - newYmin)
-                                                cropRect = r
-                                            }
-                                            .onEnded { _ in dragStartRect = nil }
+                                        .gesture(
+                                            DragGesture(minimumDistance: 0)
+                                                .onChanged { g in
+                                                    if dragStartRect == nil { dragStartRect = cropRect }
+                                                    guard let start = dragStartRect else { return }
+                                                    let dy = g.translation.height / scale
+                                                    let newYmin = max(0, min(start.minY + dy, start.maxY - minSide))
+                                                    var r = start
+                                                    r.origin.y = newYmin
+                                                    r.size.height = max(minSide, start.maxY - newYmin)
+                                                    cropRect = r
+                                                }
+                                                .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
-
+                                    
                                     // BOTTOM (Ymax) — height only
                                     handle(at: CGPoint(x: viewRect.midX, y: viewRect.maxY))
-                                        .highPriorityGesture(
-                                            DragGesture(minimumDistance: 0).onChanged { g in
-                                                if dragStartRect == nil { dragStartRect = cropRect }
-                                                guard let start = dragStartRect else { return }
-                                                let dy = g.translation.height / scale
-                                                let newYmax = min(imageSize.height, max(start.minY + minSide, start.maxY + dy))
-                                                var r = start
-                                                r.size.height = newYmax - start.minY
-                                                cropRect = r
-                                            }
-                                            .onEnded { _ in dragStartRect = nil }
+                                        .gesture(
+                                            DragGesture(minimumDistance: 0)
+                                                .onChanged { g in
+                                                    if dragStartRect == nil { dragStartRect = cropRect }
+                                                    guard let start = dragStartRect else { return }
+                                                    let dy = g.translation.height / scale
+                                                    let newYmax = min(imageSize.height, max(start.minY + minSide, start.maxY + dy))
+                                                    var r = start
+                                                    r.size.height = newYmax - start.minY
+                                                    cropRect = r
+                                                }
+                                                .onEnded { _ in dragStartRect = nil }
                                         )
                                         .zIndex(3)
-
+                                    
                                 }
                                 .onAppear {
                                     if cropRect == .zero {
@@ -201,67 +192,71 @@ struct ContentView: View {
                     Divider()
                     GroupBox("BBox Inspector (px)") {
                         VStack(alignment: .leading, spacing: 8) {
-                            // Xmin
+                            // LEFT inset (pixels from left edge)
                             HStack {
-                                Text("Xmin").frame(width: 42, alignment: .trailing)
-                                TextField("Xmin", value: Binding(
-                                    get: { Double(cropRect.minX) },
-                                    set: { v in applyXMin(CGFloat(v)) }
+                                Text("Left").frame(width: 60, alignment: .trailing)
+                                TextField("Left", value: Binding(
+                                    get: { Swift.Double(cropRect.minX) },
+                                    set: { (v: Double) in applyLeftInset(v) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudgeXMin(+1)
+                                    nudgeLeftInset(+1)
                                 } onDecrement: {
-                                    nudgeXMin(-1)
-                                }
-                                .labelsHidden()
+                                    nudgeLeftInset(-1)
+                                }.labelsHidden()
                             }
-
-                            // Xmax
+                            
+                            // RIGHT inset (pixels from right edge)
                             HStack {
-                                Text("Xmax").frame(width: 42, alignment: .trailing)
-                                TextField("Xmax", value: Binding(
-                                    get: { Double(cropRect.maxX) },
-                                    set: { v in applyXMax(CGFloat(v)) }
+                                Text("Right").frame(width: 60, alignment: .trailing)
+                                TextField("Right", value: Binding(
+                                    get: {
+                                        guard let cg = original else { return 0 }
+                                        let imgW = Swift.Double(cg.width)
+                                        return imgW - Swift.Double(cropRect.maxX)
+                                    },
+                                    set: { (v: Double) in applyRightInset(v) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudgeXMax(+1)
+                                    nudgeRightInset(+1)
                                 } onDecrement: {
-                                    nudgeXMax(-1)
-                                }
-                                .labelsHidden()
+                                    nudgeRightInset(-1)
+                                }.labelsHidden()
                             }
-
-                            // Ymin
+                            
+                            // TOP inset (pixels from top edge)
                             HStack {
-                                Text("Ymin").frame(width: 42, alignment: .trailing)
-                                TextField("Ymin", value: Binding(
-                                    get: { Double(cropRect.minY) },
-                                    set: { v in applyYMin(CGFloat(v)) }
+                                Text("Top").frame(width: 60, alignment: .trailing)
+                                TextField("Top", value: Binding(
+                                    get: { Swift.Double(cropRect.minY) },
+                                    set: { (v: Double) in applyTopInset(v) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudgeYMin(+1)
+                                    nudgeTopInset(+1)
                                 } onDecrement: {
-                                    nudgeYMin(-1)
-                                }
-                                .labelsHidden()
+                                    nudgeTopInset(-1)
+                                }.labelsHidden()
                             }
-
-                            // Ymax
+                            
+                            // BOTTOM inset (pixels from bottom edge)
                             HStack {
-                                Text("Ymax").frame(width: 42, alignment: .trailing)
-                                TextField("Ymax", value: Binding(
-                                    get: { Double(cropRect.maxY) },
-                                    set: { v in applyYMax(CGFloat(v)) }
+                                Text("Bottom").frame(width: 60, alignment: .trailing)
+                                TextField("Bottom", value: Binding(
+                                    get: {
+                                        guard let cg = original else { return 0 }
+                                        let imgH = Swift.Double(cg.height)
+                                        return imgH - Swift.Double(cropRect.maxY)
+                                    },
+                                    set: { (v: Double) in applyBottomInset(v) }
                                 ), formatter: numFmt)
                                 Stepper("") {
-                                    nudgeYMax(+1)
+                                    nudgeBottomInset(+1)
                                 } onDecrement: {
-                                    nudgeYMax(-1)
-                                }
-                                .labelsHidden()
+                                    nudgeBottomInset(-1)
+                                }.labelsHidden()
                             }
-
-                            Text("Width/height are implied by (Xmin,Xmax,Ymin,Ymax).")
+                            
+                            Text("Insets are pixels from each image edge. Width/height are implied.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -294,20 +289,20 @@ struct ContentView: View {
                 let step: CGFloat = ev.modifierFlags.contains(.shift) ? 10 : 1
                 let isResize = ev.modifierFlags.contains(.option)
                 switch ev.keyCode {
-                case 123: // left
-                    if isResize { resize(dw: -step, dh: 0) } else { nudge(dx: -step, dy: 0) }
-                    return nil
-                case 124: // right
-                    if isResize { resize(dw: step, dh: 0) } else { nudge(dx: step, dy: 0) }
-                    return nil
-                case 125: // down
-                    if isResize { resize(dw: 0, dh: step) } else { nudge(dx: 0, dy: step) }
-                    return nil
-                case 126: // up
-                    if isResize { resize(dw: 0, dh: -step) } else { nudge(dx: 0, dy: -step) }
-                    return nil
-                default:
-                    break
+                    case 123: // left
+                        if isResize { resize(dw: -step, dh: 0) } else { nudge(dx: -step, dy: 0) }
+                        return nil
+                    case 124: // right
+                        if isResize { resize(dw: step, dh: 0) } else { nudge(dx: step, dy: 0) }
+                        return nil
+                    case 125: // down
+                        if isResize { resize(dw: 0, dh: step) } else { nudge(dx: 0, dy: step) }
+                        return nil
+                    case 126: // up
+                        if isResize { resize(dw: 0, dh: -step) } else { nudge(dx: 0, dy: -step) }
+                        return nil
+                    default:
+                        break
                 }
                 return ev
             }
@@ -357,7 +352,7 @@ struct ContentView: View {
         r.origin.y = max(0, min(r.origin.y + dy, CGFloat(cg.height) - r.height))
         cropRect = r
     }
-
+    
     private func resize(dw: CGFloat, dh: CGFloat) {
         guard let cg = original else { return }
         var r = cropRect
@@ -376,7 +371,7 @@ struct ContentView: View {
         r.size.width = max(minSide, xmax - xmin)
         cropRect = r
     }
-
+    
     private func applyXMax(_ newXmax: CGFloat) {
         guard let cg = original else { return }
         let imgW = CGFloat(cg.width)
@@ -386,7 +381,7 @@ struct ContentView: View {
         r.size.width = xmax - xmin
         cropRect = r
     }
-
+    
     private func applyYMin(_ newYmin: CGFloat) {
         guard let cg = original else { return }
         let imgH = CGFloat(cg.height)
@@ -397,7 +392,7 @@ struct ContentView: View {
         r.size.height = max(minSide, ymax - ymin)
         cropRect = r
     }
-
+    
     private func applyYMax(_ newYmax: CGFloat) {
         guard let cg = original else { return }
         let imgH = CGFloat(cg.height)
@@ -407,7 +402,7 @@ struct ContentView: View {
         r.size.height = ymax - ymin
         cropRect = r
     }
-
+    
     // Steppers / keyboard helpers
     private func nudgeXMin(_ amount: CGFloat) { applyXMin(cropRect.minX + amount) }
     private func nudgeXMax(_ amount: CGFloat) { applyXMax(cropRect.maxX + amount) }
@@ -452,6 +447,65 @@ struct ContentView: View {
         path.addLine(to: CGPoint(x: x1, y: y1 - length))
         return path
     }
+    
+    // MARK: - Inset-based helpers (pixels from each image edge) — Double API for unambiguous TextField bindings
+    private func applyLeftInset(_ left: Double) {
+        guard let cg = original else { return }
+        let imgW = Double(cg.width)
+        var r = cropRect
+        let right = imgW - Double(r.maxX)
+        let l = max(0, min(left, imgW - right - Double(minSide)))
+        r.origin.x = CGFloat(l)
+        r.size.width = CGFloat(imgW - l - right)
+        cropRect = r
+    }
+
+    private func applyRightInset(_ right: Double) {
+        guard let cg = original else { return }
+        let imgW = Double(cg.width)
+        var r = cropRect
+        let left = Double(r.minX)
+        let rr = max(0, min(right, imgW - left - Double(minSide)))
+        r.size.width = CGFloat(imgW - left - rr)
+        cropRect = r
+    }
+
+    private func applyTopInset(_ top: Double) {
+        guard let cg = original else { return }
+        let imgH = Double(cg.height)
+        var r = cropRect
+        let bottom = imgH - Double(r.maxY)
+        let t = max(0, min(top, imgH - bottom - Double(minSide)))
+        r.origin.y = CGFloat(t)
+        r.size.height = CGFloat(imgH - t - bottom)
+        cropRect = r
+    }
+
+    private func applyBottomInset(_ bottom: Double) {
+        guard let cg = original else { return }
+        let imgH = Double(cg.height)
+        var r = cropRect
+        let top = Double(r.minY)
+        let bb = max(0, min(bottom, imgH - top - Double(minSide)))
+        r.size.height = CGFloat(imgH - top - bb)
+        cropRect = r
+    }
+
+    private func nudgeLeftInset(_ d: CGFloat)  { applyLeftInset(Double(cropRect.minX) + Double(d)) }
+    private func nudgeRightInset(_ d: CGFloat) {
+        guard let cg = original else { return }
+        let imgW = Double(cg.width)
+        let right = imgW - Double(cropRect.maxX)
+        applyRightInset(right + Double(d))
+    }
+    private func nudgeTopInset(_ d: CGFloat)   { applyTopInset(Double(cropRect.minY) + Double(d)) }
+    private func nudgeBottomInset(_ d: CGFloat) {
+        guard let cg = original else { return }
+        let imgH = Double(cg.height)
+        let bottom = imgH - Double(cropRect.maxY)
+        applyBottomInset(bottom + Double(d))
+    }
+    
 }
 
 #Preview {
