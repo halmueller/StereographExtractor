@@ -14,39 +14,67 @@ import AppKit
 // MARK: - Tunable Parameters (same defaults as before)
 
 public struct SegmentParams: Equatable {
-    // Yellow (HSV) — data-driven seeds
-    public var hYellowLow: Float = 0.088
-    public var hYellowHigh: Float = 0.138
-    public var sYellowMin: Float = 0.26
-    public var vYellowMin: Float = 0.40
-
+    // Yellow (HSV) — collar yellow centered at RGB(253,214,77)
+    public var hYellowLow:  Float = 0.11   // ~40°
+    public var hYellowHigh: Float = 0.15   // ~54°
+    public var sYellowMin:  Float = 0.55   // allow slightly lower than measured 0.70
+    public var vYellowMin:  Float = 0.85   // allow slightly lower than measured 0.99
+    
     // Paper (HSV) — treat sPaperMin as a MAX saturation limit (<=), v as bright
     public var hPaperLow: Float  = 0.0
     public var hPaperHigh: Float = 1.0
     public var sPaperMin: Float  = 0.25   // interpreted as S <= sPaperMin
     public var vPaperMin: Float  = 0.85
 
-    // Edge scan
-    public var maxScanFrac: Float = 0.30
-    public var startThresh: Float = 0.62
-    public var endThresh: Float   = 0.12
+    // MARK: - Edge scan parameters
+    /// Fraction of the image edge scanned inward (0–1).
+    /// Larger values scan deeper into the image to find where the collar/paper ends.
+    /// Too small and you might miss the yellow border; too large and you risk creeping into content.
+    public var maxScanFrac: Float = 0.50
 
-    // Pads
-    public var padFracX: Float = 0.004
-    public var padFracY: Float = 0.004
+    /// Threshold (fraction along the scan line) at which to start treating pixels as foreground.
+    /// Lower = more aggressive cropping; higher = more conservative.
+    public var startThresh: Float = 0.20
 
-    // Safety / fallback
-    public var fallbackLeftFrac: Float   = 0.08
-    public var fallbackOtherFrac: Float  = 0.02
-    public var minKeepFrac: Float        = 0.28
-    public var maxTotalCropFrac: Float   = 0.45
+    /// Threshold (fraction along the scan line) at which to stop treating pixels as background.
+    /// Lower = shorter collar strip, higher = extend deeper.
+    public var endThresh:   Float = 0.80
 
-    // Optional post-bias
-    public var postBiasLeftFrac: Float   = 0.0
-    public var postBiasRightFrac: Float  = 0.0
-    public var postBiasTopFrac: Float    = 0.0
-    public var postBiasBottomFrac: Float = 0.0
 
+    // MARK: - Padding adjustments
+    /// Extra horizontal padding added to the detected box (fraction of image width).
+    /// Helps prevent accidental clipping of the stereo images.
+    public var padFracX: Float = 0.01
+
+    /// Extra vertical padding added to the detected box (fraction of image height).
+    /// Adds headroom/footroom after detection.
+    public var padFracY: Float = 0.01
+
+
+    // MARK: - Safety and fallback controls
+    /// Minimum fraction of the image width/height to preserve,
+    /// regardless of detection. Prevents over-cropping.
+    public var minKeepFrac: Float = 0.80
+
+    /// Maximum total fraction of the image that may be cropped away.
+    /// Prevents discarding too much when thresholds overshoot.
+    public var maxTotalCropFrac: Float = 0.40
+
+    /// Fallback: fraction of width to keep on the left edge
+    /// if detection fails (i.e., no clear collar found).
+    public var fallbackLeftFrac:  Float = 0.48
+
+    /// Fallback: fraction to keep on the other edges (right/top/bottom)
+    /// if detection fails.
+    public var fallbackOtherFrac: Float = 0.48
+
+
+    // MARK: - Optional post-bias
+    /// After a box is detected, bias it inward/outward
+    /// by a fraction of width (X) or height (Y).
+    /// Useful to fix systematic over- or under-cropping.
+    public var postBiasX: Float = 0.0
+    public var postBiasY: Float = 0.0
     public init() {}
 }
 
@@ -192,10 +220,10 @@ public func segment(input: CGImage,
     b = max(min(b - padY, h - 1), t + 1)
 
     // optional post-bias
-    l = min(max(l + Int(Float(w) * params.postBiasLeftFrac), 0), r - 1)
-    r = max(min(r - Int(Float(w) * params.postBiasRightFrac), w - 1), l + 1)
-    t = min(max(t + Int(Float(h) * params.postBiasTopFrac), 0), b - 1)
-    b = max(min(b - Int(Float(h) * params.postBiasBottomFrac), h - 1), t + 1)
+    l = min(max(l + Int(Float(w) * params.postBiasX), 0), r - 1)
+    r = max(min(r - Int(Float(w) * params.postBiasX), w - 1), l + 1)
+    t = min(max(t + Int(Float(h) * params.postBiasY), 0), b - 1)
+    b = max(min(b - Int(Float(h) * params.postBiasY), h - 1), t + 1)
 
     // safety / fallback
     let widthCropFrac  = Float(l + (w - 1 - r)) / Float(w)
