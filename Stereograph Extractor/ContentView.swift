@@ -21,6 +21,10 @@ struct ContentView: View {
     @State private var debugCG: CGImage?
     @State private var fallbackUsed = false
     @State private var keyMonitor: Any?
+    // Batch folder processing
+    @State private var batchFolderURL: URL?
+    @State private var batchImageURLs: [URL] = []
+    @State private var batchIndex: Int = 0
     
     private let numFmt: NumberFormatter = {
         let f = NumberFormatter()
@@ -142,15 +146,34 @@ struct ContentView: View {
             
             // Bottom bar…
             HStack {
-                Button { openImage() } label: { Label("Open…", systemImage: "folder") }
+                Button {
+                    // Single-image mode: clear any batch state
+                    batchFolderURL = nil
+                    batchImageURLs.removeAll()
+                    batchIndex = 0
+                    openImage()
+                } label: { Label("Open…", systemImage: "folder") }
                     .keyboardShortcut("o", modifiers: .command)
+                
+                Button { startBatchFromFolder() } label: { Label("Open Folder…", systemImage: "folder.badge.plus") }
+                
+                if !batchImageURLs.isEmpty {
+                    Text("Image \(batchIndex + 1) of \(batchImageURLs.count)")
+                        .foregroundStyle(.secondary)
+                }
+                
                 Toggle("Show mask/overlay", isOn: $showMask)
                 Spacer()
                 Text(fallbackUsed ? "Fallback used" : "Detection used")
                     .foregroundStyle(fallbackUsed ? .orange : .green)
                 Button { runSegmentation() } label: { Label("Re-segment", systemImage: "wand.and.stars") }
+                Button {
+                    if !batchImageURLs.isEmpty { advanceBatchIfNeeded() }
+                } label: { Label("Skip", systemImage: "forward.end") }
                 Button { applyAndSave() } label: { Label("Apply Crop & Save…", systemImage: "square.and.arrow.down") }
                     .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.return, modifiers: [])   // main Return key
+                    .keyboardShortcut(.defaultAction)           // also maps to keypad Enter
             }
             .padding(10)
         }
@@ -211,6 +234,8 @@ struct ContentView: View {
             if let url = pickSaveURL(suggestingFrom: originalInputURL, type: chosenType) {
                 try saveImage(cropped, to: url, type: chosenType, quality: 0.95)
                 appendBBoxCSV(saveURL: url, originalURL: originalInputURL, image: cg, cropRect: cropRect)
+                // >>> Auto-advance if we're in a batch
+                if !batchImageURLs.isEmpty { advanceBatchIfNeeded() }
             }
         } catch {
             NSAlert(error: error as NSError).runModal()
@@ -293,7 +318,7 @@ struct ContentView: View {
         r.size.width = CGFloat(imgW - l - right)
         cropRect = r
     }
-
+    
     private func applyRightInset(_ right: Double) {
         guard let cg = original else { return }
         let imgW = Double(cg.width)
@@ -303,7 +328,7 @@ struct ContentView: View {
         r.size.width = CGFloat(imgW - left - rr)
         cropRect = r
     }
-
+    
     private func applyTopInset(_ top: Double) {
         guard let cg = original else { return }
         let imgH = Double(cg.height)
@@ -314,7 +339,7 @@ struct ContentView: View {
         r.size.height = CGFloat(imgH - t - bottom)
         cropRect = r
     }
-
+    
     private func applyBottomInset(_ bottom: Double) {
         guard let cg = original else { return }
         let imgH = Double(cg.height)
@@ -324,7 +349,7 @@ struct ContentView: View {
         r.size.height = CGFloat(imgH - top - bb)
         cropRect = r
     }
-
+    
     private func nudgeLeftInset(_ d: CGFloat)  { applyLeftInset(Double(cropRect.minX) + Double(d)) }
     private func nudgeRightInset(_ d: CGFloat) {
         guard let cg = original else { return }
@@ -340,107 +365,186 @@ struct ContentView: View {
         applyBottomInset(bottom + Double(d))
     }
     
-
-// MARK: - CSV logging of bbox
-private func appendBBoxCSV(saveURL: URL, originalURL: URL?, image: CGImage, cropRect: CGRect) {
-    // Compute insets from each edge (pixels)
-    let imgW = Double(image.width)
-    let imgH = Double(image.height)
-    let left   = Double(cropRect.minX)
-    let top    = Double(cropRect.minY)
-    let right  = imgW - Double(cropRect.maxX)
-    let bottom = imgH - Double(cropRect.maxY)
-
-    let filename = saveURL.lastPathComponent
-
-    // Prefer writing CSV **next to the saved file** (same folder). NSSavePanel grants access here.
-    let saveFolder = saveURL.deletingLastPathComponent()
-    let saveCSV    = saveFolder.appendingPathComponent("training_bboxes.csv")
-
-    // Secondary: original folder if available (may fail due to sandbox perms)
-    let origFolder = originalURL?.deletingLastPathComponent()
-    let origCSV    = origFolder?.appendingPathComponent("training_bboxes.csv")
-
-    // CSV row
-    let header = "filename,left,top,right,bottom,image_width,image_height\n"
-    let line   = "\(filename),\(left),\(top),\(right),\(bottom),\(imgW),\(imgH)\n"
-
-    // Helper to append or create-with-header
-    func writeLine(to url: URL) throws {
-        let fm = FileManager.default
-        if !fm.fileExists(atPath: url.path) {
-            // Create file with header
-            let data = (header + line).data(using: .utf8)!
-            try data.write(to: url, options: .atomic)
-        } else {
-            let fh = try FileHandle(forWritingTo: url)
-            defer { try? fh.close() }
-            try fh.seekToEnd()
-            let data = line.data(using: .utf8)!
-            try fh.write(contentsOf: data)
+    
+    // MARK: - CSV logging of bbox
+    private func appendBBoxCSV(saveURL: URL, originalURL: URL?, image: CGImage, cropRect: CGRect) {
+        // Compute insets from each edge (pixels)
+        let imgW = Double(image.width)
+        let imgH = Double(image.height)
+        let left   = Double(cropRect.minX)
+        let top    = Double(cropRect.minY)
+        let right  = imgW - Double(cropRect.maxX)
+        let bottom = imgH - Double(cropRect.maxY)
+        
+        let filename = saveURL.lastPathComponent
+        
+        // Prefer writing CSV **next to the saved file** (same folder). NSSavePanel grants access here.
+        let saveFolder = saveURL.deletingLastPathComponent()
+        let saveCSV    = saveFolder.appendingPathComponent("training_bboxes.csv")
+        
+        // Secondary: original folder if available (may fail due to sandbox perms)
+        let origFolder = originalURL?.deletingLastPathComponent()
+        let origCSV    = origFolder?.appendingPathComponent("training_bboxes.csv")
+        
+        // CSV row
+        let header = "filename,left,top,right,bottom,image_width,image_height\n"
+        let line   = "\(filename),\(left),\(top),\(right),\(bottom),\(imgW),\(imgH)\n"
+        
+        // Helper to append or create-with-header
+        func writeLine(to url: URL) throws {
+            let fm = FileManager.default
+            if !fm.fileExists(atPath: url.path) {
+                // Create file with header
+                let data = (header + line).data(using: .utf8)!
+                try data.write(to: url, options: .atomic)
+            } else {
+                let fh = try FileHandle(forWritingTo: url)
+                defer { try? fh.close() }
+                try fh.seekToEnd()
+                let data = line.data(using: .utf8)!
+                try fh.write(contentsOf: data)
+            }
         }
-    }
-
-    // Try save folder first
-    do {
-        try writeLine(to: saveCSV)
-        return
-    } catch {
-        NSLog("[CSV] Could not write beside saved file: \(error.localizedDescription)")
-    }
-
-    // Try original folder second (if any)
-    if let origCSV {
+        
+        // Try save folder first
         do {
-            try writeLine(to: origCSV)
+            try writeLine(to: saveCSV)
             return
         } catch {
-            NSLog("[CSV] Could not write in original folder: \(error.localizedDescription)")
+            NSLog("[CSV] Could not write beside saved file: \(error.localizedDescription)")
+        }
+        
+        // Try original folder second (if any)
+        if let origCSV {
+            do {
+                try writeLine(to: origCSV)
+                return
+            } catch {
+                NSLog("[CSV] Could not write in original folder: \(error.localizedDescription)")
+            }
+        }
+        
+        // Last resort: prompt the user for a location to save/append the CSV
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.commaSeparatedText]
+        panel.nameFieldStringValue = "training_bboxes.csv"
+        panel.message = "Select where to save the training CSV."
+        if panel.runModal() == .OK, let url = panel.url {
+            do {
+                try writeLine(to: url)
+            } catch {
+                NSLog("[CSV] Failed to save CSV after user prompt: \(error.localizedDescription)")
+            }
         }
     }
-
-    // Last resort: prompt the user for a location to save/append the CSV
-    let panel = NSSavePanel()
-    panel.allowedContentTypes = [.commaSeparatedText]
-    panel.nameFieldStringValue = "training_bboxes.csv"
-    panel.message = "Select where to save the training CSV."
-    if panel.runModal() == .OK, let url = panel.url {
-        do {
-            try writeLine(to: url)
-        } catch {
-            NSLog("[CSV] Failed to save CSV after user prompt: \(error.localizedDescription)")
+    
+    // MARK: - Folder picker and pair discovery
+    
+    /// File picker (image) with optional title/message
+    private func pickImageURL(title: String? = nil, message: String? = nil) -> URL? {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.jpeg, .png, .tiff, .heic, .jpeg2000]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        if let t = title { panel.title = t }
+        if let m = message { panel.message = m }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+    
+    /// Infer output file type from the original input URL (defaults to .jpeg)
+    private func inferredOutputType(from url: URL?) -> UTType {
+        guard let ext = url?.pathExtension.lowercased() else { return .jpeg }
+        switch ext {
+            case "jp2", "j2k": return .jpeg2000
+            case "png":        return .png
+            case "tif", "tiff":return .tiff
+            case "heic":       return .heic
+            case "jpg", "jpeg":return .jpeg
+            default:           return .jpeg
+        }
+    }
+    
+    // Supported input types (by extension)
+    private let batchSupportedExts: Set<String> = ["jpg","jpeg","png","tif","tiff","heic","jp2","j2k"]
+    
+    private func pickFolderURL(title: String? = nil, message: String? = nil) -> URL? {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if let t = title { panel.title = t }
+        if let m = message { panel.message = m }
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+    
+    /// Load current batch image (batchImageURLs[batchIndex]) and segment it.
+    private func loadCurrentBatchImage() {
+        guard batchIndex >= 0, batchIndex < batchImageURLs.count else { return }
+        let url = batchImageURLs[batchIndex]
+        if let cg = cgImageFromURL(url) {
+            originalInputURL = url
+            original = cg
+            runSegmentation()
+        }
+    }
+    
+    /// Start batch by picking a folder and loading the first image.
+    private func startBatchFromFolder() {
+        guard let folder = pickFolderURL(title: "Pick folder of images",
+                                         message: "Files will be processed in alphabetical order.") else { return }
+        let fm = FileManager.default
+        guard let items = try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) else { return }
+        
+        // Filter: supported extensions, exclude any *_cropped.* files
+        let candidates = items.filter { url in
+            let base = url.deletingPathExtension().lastPathComponent.lowercased()
+            let ext = url.pathExtension.lowercased()
+            return batchSupportedExts.contains(ext) && !base.hasSuffix("_cropped")
+        }
+            .sorted { $0.lastPathComponent.localizedCaseInsensitiveCompare($1.lastPathComponent) == .orderedAscending }
+        
+        guard !candidates.isEmpty else {
+            let a = NSAlert()
+            a.messageText = "No images found"
+            a.informativeText = "Only \(batchSupportedExts.sorted().joined(separator: ", ")) are accepted, and *_cropped files are skipped."
+            a.alertStyle = .informational
+            a.runModal()
+            return
+        }
+        
+        // Save state
+        batchFolderURL = folder
+        batchImageURLs = candidates
+        batchIndex = 0
+        
+        // Load first
+        loadCurrentBatchImage()
+    }
+    
+    /// Advance to the next image in the batch; show a “done” alert at the end.
+    private func advanceBatchIfNeeded() {
+        guard !batchImageURLs.isEmpty else { return }
+        batchIndex += 1
+        if batchIndex < batchImageURLs.count {
+            loadCurrentBatchImage()
+        } else {
+            // Done
+            let a = NSAlert()
+            a.messageText = "Folder complete"
+            a.informativeText = "Processed \(batchImageURLs.count) images in \(batchFolderURL?.lastPathComponent ?? "folder")."
+            a.alertStyle = .informational
+            a.runModal()
+            // Clear batch state
+            batchFolderURL = nil
+            batchImageURLs.removeAll()
+            batchIndex = 0
+            // Optionally clear the UI
+            original = nil
+            originalInputURL = nil
+            cropRect = .zero
         }
     }
 }
-}
-
-
-// MARK: - Folder picker and pair discovery
-
-/// File picker (image) with optional title/message
-private func pickImageURL(title: String? = nil, message: String? = nil) -> URL? {
-    let panel = NSOpenPanel()
-    panel.allowedContentTypes = [.jpeg, .png, .tiff, .heic, .jpeg2000]
-    panel.allowsMultipleSelection = false
-    panel.canChooseDirectories = false
-    if let t = title { panel.title = t }
-    if let m = message { panel.message = m }
-    return panel.runModal() == .OK ? panel.url : nil
-}
-
-/// Infer output file type from the original input URL (defaults to .jpeg)
-private func inferredOutputType(from url: URL?) -> UTType {
-    guard let ext = url?.pathExtension.lowercased() else { return .jpeg }
-    switch ext {
-    case "jp2", "j2k": return .jpeg2000
-    case "png":        return .png
-    case "tif", "tiff":return .tiff
-    case "heic":       return .heic
-    case "jpg", "jpeg":return .jpeg
-    default:           return .jpeg
-    }
-}
-
 
 #Preview {
     ContentView()
