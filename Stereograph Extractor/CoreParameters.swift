@@ -14,11 +14,11 @@ import AppKit
 // MARK: - Tunable Parameters (same defaults as before)
 
 public struct SegmentParams: Equatable {
-    // Yellow (HSV) — collar yellow centered at RGB(253,214,77)
+    // Yellow (HSV) — collar yellow broadened to cover 239,194,94 and 253,214,77
     public var hYellowLow:  Float = 0.11   // ~40°
     public var hYellowHigh: Float = 0.15   // ~54°
-    public var sYellowMin:  Float = 0.55   // allow slightly lower than measured 0.70
-    public var vYellowMin:  Float = 0.85   // allow slightly lower than measured 0.99
+    public var sYellowMin:  Float = 0.55   // down from 0.70 → now covers ~0.61
+    public var vYellowMin:  Float = 0.90   // down from 0.99 → now covers ~0.94
     
     // Paper (HSV) — treat sPaperMin as a MAX saturation limit (<=), v as bright
     public var hPaperLow: Float  = 0.0
