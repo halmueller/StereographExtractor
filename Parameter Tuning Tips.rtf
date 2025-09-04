@@ -1,0 +1,187 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 .SFNS-Semibold;\f1\fnil\fcharset0 .SFNS-Regular;\f2\fnil\fcharset0 HelveticaNeue-Bold;
+\f3\fnil\fcharset0 .SFNS-RegularItalic;\f4\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;\red14\green14\blue14;}
+{\*\expandedcolortbl;;\cssrgb\c6700\c6700\c6700;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f0\b\fs44 \cf2 \uc0\u55357 \u56536  Stereograph Extractor \'96 Parameter Tuning Guide
+\f1\b0\fs28 \
+\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f0\b\fs30 \cf2 Edge Scan
+\f1\b0\fs28 \
+\
+These control how the algorithm 
+\f2\b searches inward from each edge
+\f1\b0  to decide where to stop cropping the yellow collar / paper.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b maxScanFrac
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Fraction of image scanned inward (0\'961).
+\f1\i0 \
+Larger values = scan deeper into the image. Use when collars are wide.\
+Smaller values = faster, but might miss deep borders.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b startThresh
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Threshold to start treating pixels as foreground.
+\f1\i0 \
+Lower values = more aggressive crop (cuts collar earlier).\
+Higher values = more conservative (may leave collar in).\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b endThresh
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Threshold to stop treating pixels as background.
+\f1\i0 \
+Lower values = tighter crop.\
+Higher values = looser, leaves more margin.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f4\fs24 \cf0 \
+\uc0\u11835 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f1\fs28 \cf2 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f0\b\fs30 \cf2 Pads
+\f1\b0\fs28 \
+\
+After the scan finds edges, these add a little 
+\f2\b extra breathing room
+\f1\b0 :\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b padFracX
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Horizontal padding as fraction of width.
+\f1\i0 \
+Prevents cutting too close to stereo pair edges.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b padFracY
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Vertical padding as fraction of height.
+\f1\i0 \
+Useful if top/bottom borders are thin or irregular.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f4\fs24 \cf0 \
+\uc0\u11835 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f1\fs28 \cf2 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f0\b\fs30 \cf2 Safety / Fallback
+\f1\b0\fs28 \
+\
+Guards against detection failures or extreme crops:\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b minKeepFrac
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Minimum fraction of width/height preserved.
+\f1\i0 \
+Stops the crop box from getting too small.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b maxTotalCropFrac
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Maximum fraction of the image that can be cropped away.
+\f1\i0 \
+Prevents discarding most of the photo.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b fallbackLeftFrac
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Default left inset if detection fails.
+\f1\i0 \
+(e.g. use ~0.48 to keep roughly half the width).\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b fallbackOtherFrac
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Default right/top/bottom inset if detection fails.
+\f1\i0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f4\fs24 \cf0 \
+\uc0\u11835 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f1\fs28 \cf2 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f0\b\fs30 \cf2 Optional Post-Bias
+\f1\b0\fs28 \
+\
+Final adjustments applied 
+\f2\b after detection
+\f1\b0 :\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b postBiasX
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Shift box inward/outward horizontally.
+\f1\i0 \
+Positive = crop tighter; negative = loosen.\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	
+\f2\b postBiasY
+\f1\b0 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\fi260\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f3\i \cf2 Shift box inward/outward vertically.
+\f1\i0 \
+Lets you compensate for systematic over/under cropping.\
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\pardirnatural\partightenfactor0
+
+\f4\fs24 \cf0 \
+\uc0\u11835 \
+\pard\tx560\tx1120\tx1680\tx2240\tx2800\tx3360\tx3920\tx4480\tx5040\tx5600\tx6160\tx6720\sl324\slmult1\pardirnatural\partightenfactor0
+
+\f1\fs28 \cf2 \
+\uc0\u55357 \u56393  
+\f2\b Tuning workflow tip
+\f1\b0 :\
+\pard\tqr\tx100\tx260\li260\fi-260\sl324\slmult1\sb240\partightenfactor0
+\cf2 	\'95	Start with 
+\f2\b Edge Scan
+\f1\b0  to dial in collar detection.\
+	\'95	Add a bit of 
+\f2\b Pad
+\f1\b0  so you don\'92t cut into the stereo image.\
+	\'95	Use 
+\f2\b Safety/Fallback
+\f1\b0  only if detection fails or crops wildly.\
+	\'95	Apply 
+\f2\b Post-Bias
+\f1\b0  if you consistently see under/over cropping across a batch.\
+}
